@@ -38,6 +38,10 @@ export async function getRecordStatusAction(recordId: string) {
       .innerJoin(records, eq(tasks.recordId, records.id))
       .where(eq(tasks.recordId, recordId))
       .limit(1);
+    customLog(
+      "service > record > getRecordStatusAction: 该次API的 taskRecords",
+      taskRecords
+    );
 
     // 未找到对应的task
     if (!taskRecords || taskRecords.length === 0) {
@@ -57,7 +61,10 @@ export async function getRecordStatusAction(recordId: string) {
     ) {
       return Result.success(taskRecord);
     }
-
+    customLog(
+      "service > record > getRecordStatusAction: 状态",
+      taskRecord.status
+    );
     // 获取工具实例
     const toolInstance = ToolFactory.getTool(taskRecord.tool);
 
@@ -70,7 +77,10 @@ export async function getRecordStatusAction(recordId: string) {
       );
       throw new Error(`不支持的工具: ${taskRecord.tool}`);
     }
-
+    customLog(
+      "service > record > getRecordStatusAction: 工具实例",
+      JSON.stringify(toolInstance)
+    );
     // 构建三方API请求
     const requestConfig = toolInstance.buildTaskStatusRequest(
       taskRecord.taskId
