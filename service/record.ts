@@ -39,15 +39,15 @@ export async function getRecordStatusAction(recordId: string) {
       .where(eq(tasks.recordId, recordId))
       .limit(1);
 
-    const taskRecord = taskRecords[0];
     // 未找到对应的task
-    if (!taskRecord) {
+    if (!taskRecords || taskRecords.length === 0) {
       customError(
         "service > record > getRecordStatusAction:",
         "未找到对应的任务记录"
       );
       throw new Error("未找到对应的任务记录");
     }
+    const taskRecord = taskRecords[0];
 
     // 如果状态是成功或失败 直接返回
     if (
