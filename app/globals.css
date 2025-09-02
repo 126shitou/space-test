@@ -1,0 +1,57 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+:root {
+}
+
+@theme inline {
+  /* --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono); */
+  --font-inter: var(--font-inter); /* Inter字体变量定义 */
+
+  --color-primary: #8a38fc;
+
+  /* background-primary */
+  --color-b-p: #ffffff;
+  --color-b-s: #f6f7f9;
+  /* hover:bg primary */
+  --color-hb-p: #f6f7f9;
+
+  /* text-primary */
+  --color-t-p: #0d0d0d;
+  /* text-secondary */
+  --color-t-s: #3e4144;
+  /* text-muted */
+  --color-t-m: #949599;
+  /* hr-color */
+  --color-hr: #ececec;
+
+  /* --border-primary */
+  --color-bd-p: #7f7f7f;
+  /* --border-secondary */
+  --color-bd-s: #2a2a2a;
+
+  /* --btn-bg-primary */
+  --color-btn-primary: #222529;
+  --color-btn-primary-hover: #4c535c;
+  /* --btn-bg-secondary */
+  --color-btn-secondary: #e8eaec;
+  --color-btn-secondary-hover: #d9dcdf;
+
+  --height-header: 60px;
+
+  --breakpoint-3xl: 120rem;
+}
+
+html,
+body {
+  min-height: 100vh;
+  background-color: var(--color-g-p);
+}
+
+/* CSS 使用 */
+/* @import url("https://fonts.googleapis.com/css2?family=Sora:wght@100;200;300;400;500;600;700;800&display=swap");
+
+body {
+  font-family: "Sora", sans-serif;
+} */

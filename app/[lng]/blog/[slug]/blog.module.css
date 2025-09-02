@@ -1,0 +1,18 @@
+.articleContent {
+
+  h1 {
+    /* font-size: 48px; */
+    text-align: center;
+    font-weight: 500;
+  }
+
+  p {
+    /* line-height: 32px; */
+    margin-bottom: 24px;
+    max-width: 100%;
+    /* display: block; */
+    /* font-size: 16px; */
+    color: #828282;
+  }
+
+}

@@ -1,0 +1,1 @@
+export const SUBSCRIPTION_TYPE = ["free", "basic", "pro"] as const;
