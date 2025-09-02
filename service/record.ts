@@ -25,36 +25,74 @@ export async function getRecordStatusAction(recordId: string) {
 
     // 记录数据库查询开始时间
     const dbQueryStart = Date.now();
-    // 联表查询task
-    const taskRecords = await db
+
+    // 第一步：查询task表
+    const taskList = await db
       .select({
         id: tasks.id,
         taskId: tasks.taskId,
         status: tasks.status,
         submitAt: tasks.submitAt,
-        tool: records.tool,
-        supabaseId: records.supabaseId,
-        recordId: records.id,
+        recordId: tasks.recordId,
       })
       .from(tasks)
-      .innerJoin(records, eq(tasks.recordId, records.id))
+      .where(eq(tasks.recordId, recordId))
       .limit(1);
-      
-    const dbQueryEnd = Date.now();
-    customLog("数据库查询耗时", `${dbQueryEnd - dbQueryStart}ms`);
-    customLog(
-      "service > record > getRecordStatusAction: 该次API的 taskRecords",
-      JSON.stringify(taskRecords)
-    );
 
-    // 未找到对应的task
-    if (!taskRecords || taskRecords.length === 0) {
+    if (!taskList || taskList.length === 0) {
+      const dbQueryEnd = Date.now();
+      customLog("数据库查询耗时", `${dbQueryEnd - dbQueryStart}ms`);
       customError(
         "service > record > getRecordStatusAction:",
         "未找到对应的任务记录"
       );
       throw new Error("未找到对应的任务记录");
     }
+
+    const task = taskList[0];
+
+    // 第二步：根据recordId查询record表
+    const recordList = await db
+      .select({
+        tool: records.tool,
+        supabaseId: records.supabaseId,
+        id: records.id,
+      })
+      .from(records)
+      .where(eq(records.id, task.recordId))
+      .limit(1);
+
+    if (!recordList || recordList.length === 0) {
+      const dbQueryEnd = Date.now();
+      customLog("数据库查询耗时", `${dbQueryEnd - dbQueryStart}ms`);
+      customError(
+        "service > record > getRecordStatusAction:",
+        "未找到对应的记录信息"
+      );
+      throw new Error("未找到对应的记录信息");
+    }
+
+    const record = recordList[0];
+
+    // 合并查询结果
+    const taskRecords = [
+      {
+        id: task.id,
+        taskId: task.taskId,
+        status: task.status,
+        submitAt: task.submitAt,
+        tool: record.tool,
+        supabaseId: record.supabaseId,
+        recordId: record.id,
+      },
+    ];
+
+    const dbQueryEnd = Date.now();
+    customLog("数据库查询耗时", `${dbQueryEnd - dbQueryStart}ms`);
+    customLog(
+      "service > record > getRecordStatusAction: 该次API的 taskRecords",
+      JSON.stringify(taskRecords)
+    );
     const taskRecord = taskRecords[0];
 
     // 如果状态是成功或失败 直接返回
