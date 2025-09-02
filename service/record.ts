@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+"use server";
+
 import { customError, customLog, customSuccess } from "@/lib/utils/log";
 import { db } from "@/lib/db";
 import { tasks, records } from "@/lib/db/schema/generation";
@@ -8,20 +9,24 @@ import { GenerationStatus } from "@/types/generation";
 import { ToolFactory } from "@/lib/factory";
 import ConvertMedia from "@/service/media";
 
-// 获取任务状态并返回/存储
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ recordId: string }> }
-) {
+/**
+ * 获取任务状态的Server Action
+ * @param recordId - 记录ID
+ * @returns 返回任务状态结果
+ */
+export async function getRecordStatusAction(recordId: string) {
   try {
-    const { recordId } = await params;
+    customLog("service > record > getRecordStatusAction: recordId", recordId);
 
-    // 打印完整的请求信息
-    customLog("record/[recordId] 完整URL:", request.url);
+    // 添加超时控制的数据库查询
+    const queryTimeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("数据库查询超时")), 15000);
+    });
 
-    customLog("api > thirdApi > record > POST: 该次API的 recordId", recordId);
+    customLog("service > record > getRecordStatusAction: 开始数据库查询");
+
     // 联表查询task
-    const taskRecords = await db
+    const taskRecordsPromise = db
       .select({
         id: tasks.id,
         taskId: tasks.taskId,
@@ -36,10 +41,17 @@ export async function POST(
       .where(eq(tasks.recordId, recordId))
       .limit(1);
 
+    const taskRecords = await Promise.race([taskRecordsPromise, queryTimeout]);
+
+    customLog("service > record > getRecordStatusAction: 数据库查询完成");
+
     const taskRecord = taskRecords[0];
     // 未找到对应的task
     if (!taskRecord) {
-      customError("api > thirdApi > record > POST:", "未找到对应的任务记录");
+      customError(
+        "service > record > getRecordStatusAction:",
+        "未找到对应的任务记录"
+      );
       throw new Error("未找到对应的任务记录");
     }
 
@@ -49,7 +61,7 @@ export async function POST(
         taskRecord.status as GenerationStatus
       )
     ) {
-      return NextResponse.json(Result.success(taskRecord));
+      return Result.success(taskRecord);
     }
 
     // 获取工具实例
@@ -57,7 +69,7 @@ export async function POST(
 
     if (!toolInstance) {
       customError(
-        "api > thirdApi > generate > POST: 不支持的工具",
+        "service > record > getRecordStatusAction: 不支持的工具",
         `Tool: ${
           taskRecord.tool
         }, Supported: ${ToolFactory.getSupportedTools().join(", ")}`
@@ -71,8 +83,18 @@ export async function POST(
     );
     customLog("第三方API请求", `URL: ${requestConfig.url}`);
 
+    // 添加超时控制的第三方API请求
+    const apiTimeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("第三方API请求超时")), 30000);
+    });
+
+    customLog("service > record > getRecordStatusAction: 开始第三方API请求");
+
     // 发起第三方API请求
-    const response = await fetch(requestConfig.url, requestConfig.options);
+    const responsePromise = fetch(requestConfig.url, requestConfig.options);
+    const response = await Promise.race([responsePromise, apiTimeout]);
+
+    customLog("service > record > getRecordStatusAction: 第三方API请求完成");
 
     if (!response.ok)
       throw new Error(
@@ -92,11 +114,23 @@ export async function POST(
       processedData?.status == GenerationStatus.SUCCEED &&
       processedData.urls.length > 0
     ) {
-      customLog("api > thirdApi > record > POST: 任务成功", "转化url中");
+      customLog(
+        "service > record > getRecordStatusAction: 任务成功",
+        "转化url中"
+      );
 
       try {
+        // 添加超时控制的媒体文件上传
+        const uploadTimeout = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("媒体文件上传超时")), 60000);
+        });
+
+        customLog(
+          "service > record > getRecordStatusAction: 开始批量上传媒体文件"
+        );
+
         // 使用ConvertMedia将所有URLs上传到Cloudflare R2
-        const cloudflareUrls = await Promise.all(
+        const cloudflareUrlsPromise = Promise.all(
           processedData.urls.map(async (url: string) => {
             try {
               const cloudflareUrl = await ConvertMedia(
@@ -125,6 +159,11 @@ export async function POST(
           })
         );
 
+        const cloudflareUrls = await Promise.race([
+          cloudflareUrlsPromise,
+          uploadTimeout,
+        ]);
+
         // 更新processedData中的URLs
         processedData.urls = cloudflareUrls.filter(
           (url) => url !== null
@@ -140,12 +179,15 @@ export async function POST(
     }
 
     // 返回数据
-    return NextResponse.json(Result.success(processedData));
+    return Result.success(processedData);
   } catch (error: any) {
     const errorMsg =
       error instanceof Error ? error.message : "服务器出现异常，请稍后重试";
 
-    customError("api > thirdApi > record > POST: catch error ", errorMsg);
-    return NextResponse.json(Result.fail(errorMsg), { status: 500 });
+    customError(
+      "service > record > getRecordStatusAction: catch error ",
+      errorMsg
+    );
+    return Result.fail(errorMsg);
   }
 }

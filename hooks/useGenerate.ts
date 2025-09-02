@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { ParameterValues } from "@/types/paramaters";
 import { GenerationStatus, TaskStep } from "@/types/generation";
+import { generateAction } from "@/service/generate";
+import { getRecordStatusAction } from "@/service/record";
 
 export const useGenerate = () => {
   const [taskStep, setTaskStep] = useState<TaskStep>("none");
@@ -15,26 +17,12 @@ export const useGenerate = () => {
     setError(""); // 清除之前的错误状态
 
     try {
-      // 调用生成API创建任务
-      const response = await fetch("/api/thirdApi/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ tool, parameters, count }),
-      });
+      // 创建FormData来调用生成Server Action
+      const formData = new FormData();
+      formData.append("tool", tool);
+      formData.append("parameters", JSON.stringify(parameters));
 
-      if (!response.ok) {
-        let errorMessage = `生成请求失败: ${response.status} ${response.statusText}`;
-        const errorData = await response.json();
-
-        if (errorData?.message) {
-          errorMessage = errorData.message;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
+      const result = await generateAction(formData);
 
       if (!result.success) {
         throw new Error(result.message || "生成任务失败");
@@ -65,28 +53,15 @@ export const useGenerate = () => {
   ) => {
     let attempts = 0;
     setTaskStep("pollTaskStatus");
-    
+
     console.log("recordId", recordId);
 
     const poll = async (): Promise<any> => {
       try {
         attempts++;
 
-        // 发送POST请求查询任务状态
-        const response = await fetch(`/api/thirdApi/record/${recordId}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(
-            `状态查询失败: ${response.status} ${response.statusText}`
-          );
-        }
-
-        const result = await response.json();
+        // 调用记录状态Server Action查询任务状态
+        const result = await getRecordStatusAction(recordId);
 
         if (!result.success) {
           throw new Error(result.message || "状态查询失败");
