@@ -4,7 +4,7 @@ import { customError, customLog, customSuccess } from "@/lib/utils/log";
 import { db } from "@/lib/db";
 import { tasks, records } from "@/lib/db/schema/generation";
 import { eq } from "drizzle-orm";
-import { Result, ResultType } from "@/lib/utils/result";
+import { Result } from "@/lib/utils/result";
 import { GenerationStatus } from "@/types/generation";
 import { ToolFactory } from "@/lib/factory";
 import ConvertMedia from "@/service/media";
@@ -38,8 +38,8 @@ export async function getRecordStatusAction(recordId: string) {
       })
       .from(tasks)
       .innerJoin(records, eq(tasks.recordId, records.id))
-      .where(eq(tasks.recordId, recordId))
       .limit(1);
+      
     const dbQueryEnd = Date.now();
     customLog("数据库查询耗时", `${dbQueryEnd - dbQueryStart}ms`);
     customLog(
