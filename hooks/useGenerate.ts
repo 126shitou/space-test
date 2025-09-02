@@ -68,6 +68,9 @@ export const useGenerate = () => {
         }
 
         const taskData = result.data;
+        if (!taskData) {
+          throw new Error("任务数据不存在");
+        }
 
         // 调用状态更新回调
         if (onStatusUpdate) {
@@ -77,7 +80,7 @@ export const useGenerate = () => {
         // 检查任务是否完成（成功或失败）
         if (
           [GenerationStatus.FAILED, GenerationStatus.SUCCEED].includes(
-            taskData.status
+            taskData.status as GenerationStatus
           )
         ) {
           setTaskStep("none");
