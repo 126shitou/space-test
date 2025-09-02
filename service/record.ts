@@ -40,7 +40,7 @@ export async function getRecordStatusAction(recordId: string) {
       .limit(1);
     customLog(
       "service > record > getRecordStatusAction: 该次API的 taskRecords",
-      taskRecords
+      JSON.stringify(taskRecords)
     );
 
     // 未找到对应的task
