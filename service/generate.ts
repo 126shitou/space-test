@@ -107,6 +107,7 @@ export async function generateAction(formData: FormData) {
     }
 
     // 创建record记录并获取创建的record
+    console.time("DB-Insert-Record");
     const [nr] = await db
       .insert(records)
       .values({
@@ -118,6 +119,7 @@ export async function generateAction(formData: FormData) {
         pointsCount: pointsCount, // 积分消耗
       })
       .returning();
+    console.timeEnd("DB-Insert-Record");
 
     newRecord = nr;
 
@@ -126,11 +128,13 @@ export async function generateAction(formData: FormData) {
     // 如果登录了 查询积分是否足够
     if (pointsCount > 0 && isLogin) {
       // 查询用户当前积分
+      console.time("DB-Select-UserPoints");
       const userFromDb = await db
         .select({ points: users.points })
         .from(users)
         .where(eq(users.supabaseId, user!.id))
         .limit(1);
+      console.timeEnd("DB-Select-UserPoints");
 
       if (userFromDb.length === 0) {
         throw new Error("用户不存在");
@@ -149,7 +153,9 @@ export async function generateAction(formData: FormData) {
     console.log("requestConfig", JSON.stringify(requestConfig));
 
     // 向三方平台发送请求
+    console.time("Third-Party-API-Request");
     const response = await fetch(requestConfig.url, requestConfig.options);
+    console.timeEnd("Third-Party-API-Request");
 
     if (!response.ok) {
       customError(
@@ -158,6 +164,7 @@ export async function generateAction(formData: FormData) {
       );
 
       // 更新record状态为失败
+      console.time("DB-Update-Record-Fail");
       await db
         .update(records)
         .set({
@@ -165,6 +172,7 @@ export async function generateAction(formData: FormData) {
           updatedAt: new Date(),
         })
         .where(eq(records.id, newRecord.id));
+      console.timeEnd("DB-Update-Record-Fail");
 
       throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
     }
@@ -179,6 +187,7 @@ export async function generateAction(formData: FormData) {
 
     if (isLogin && pointsCount > 0) {
       // 扣除积分
+      console.time("DB-Update-UserPoints");
       await db
         .update(users)
         .set({
@@ -186,6 +195,7 @@ export async function generateAction(formData: FormData) {
           updatedAt: new Date(),
         })
         .where(eq(users.supabaseId, user!.id));
+      console.timeEnd("DB-Update-UserPoints");
 
       customLog(
         "积分扣除成功",
@@ -196,6 +206,7 @@ export async function generateAction(formData: FormData) {
     }
 
     // 创建task记录
+    console.time("DB-Insert-Task");
     const [newTask] = await db
       .insert(tasks)
       .values({
@@ -205,15 +216,19 @@ export async function generateAction(formData: FormData) {
         submitAt: new Date(), // 提交时间
       })
       .returning();
+    console.timeEnd("DB-Insert-Task");
 
     // 更新record状态为成功
-    db.update(records)
+    console.time("DB-Update-Record-Success");
+    await db
+      .update(records)
       .set({
         // record的状态而不是task
         status: "success",
         updatedAt: new Date(),
       })
       .where(eq(records.id, newRecord.id));
+    console.timeEnd("DB-Update-Record-Success");
 
     customLog("创建的task记录", JSON.stringify(newTask));
 
@@ -227,6 +242,7 @@ export async function generateAction(formData: FormData) {
     // 如果record已创建但发生错误，更新record状态为失败
     try {
       if (typeof newRecord !== "undefined") {
+        console.time("DB-Update-Record-Fail-Catch");
         await db
           .update(records)
           .set({
@@ -234,6 +250,7 @@ export async function generateAction(formData: FormData) {
             updatedAt: new Date(),
           })
           .where(eq(records.id, newRecord.id));
+        console.timeEnd("DB-Update-Record-Fail-Catch");
       }
     } catch (updateError) {
       customError(

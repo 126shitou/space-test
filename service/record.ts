@@ -8,7 +8,7 @@ import { Result, ResultType } from "@/lib/utils/result";
 import { GenerationStatus } from "@/types/generation";
 import { ToolFactory } from "@/lib/factory";
 import ConvertMedia from "@/service/media";
-import { RecordProcessingType } from "@/types/generation";
+
 /**
  * 获取任务状态的Server Action
  * @param recordId - 记录ID
@@ -23,6 +23,7 @@ export async function getRecordStatusAction(recordId: string) {
       recordId
     );
 
+    console.time("getRecordStatusAction");
     // 联表查询task
     const taskRecords = await db
       .select({
@@ -38,6 +39,7 @@ export async function getRecordStatusAction(recordId: string) {
       .innerJoin(records, eq(tasks.recordId, records.id))
       .where(eq(tasks.recordId, recordId))
       .limit(1);
+    console.timeEnd("getRecordStatusAction");
     customLog(
       "service > record > getRecordStatusAction: 该次API的 taskRecords",
       JSON.stringify(taskRecords)
