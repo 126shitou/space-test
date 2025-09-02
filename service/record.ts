@@ -18,15 +18,13 @@ export async function getRecordStatusAction(recordId: string) {
   try {
     customLog("service > record > getRecordStatusAction: recordId", recordId);
 
-    // 添加超时控制的数据库查询
-    const queryTimeout = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("数据库查询超时")), 15000);
-    });
-
-    customLog("service > record > getRecordStatusAction: 开始数据库查询");
+    customLog(
+      "service > record > getRecordStatusAction: 该次API的 recordId",
+      recordId
+    );
 
     // 联表查询task
-    const taskRecordsPromise = db
+    const taskRecords = await db
       .select({
         id: tasks.id,
         taskId: tasks.taskId,
@@ -40,10 +38,6 @@ export async function getRecordStatusAction(recordId: string) {
       .innerJoin(records, eq(tasks.recordId, records.id))
       .where(eq(tasks.recordId, recordId))
       .limit(1);
-
-    const taskRecords = await Promise.race([taskRecordsPromise, queryTimeout]);
-
-    customLog("service > record > getRecordStatusAction: 数据库查询完成");
 
     const taskRecord = taskRecords[0];
     // 未找到对应的task
@@ -83,18 +77,8 @@ export async function getRecordStatusAction(recordId: string) {
     );
     customLog("第三方API请求", `URL: ${requestConfig.url}`);
 
-    // 添加超时控制的第三方API请求
-    const apiTimeout = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("第三方API请求超时")), 30000);
-    });
-
-    customLog("service > record > getRecordStatusAction: 开始第三方API请求");
-
     // 发起第三方API请求
-    const responsePromise = fetch(requestConfig.url, requestConfig.options);
-    const response = await Promise.race([responsePromise, apiTimeout]);
-
-    customLog("service > record > getRecordStatusAction: 第三方API请求完成");
+    const response = await fetch(requestConfig.url, requestConfig.options);
 
     if (!response.ok)
       throw new Error(
@@ -120,17 +104,8 @@ export async function getRecordStatusAction(recordId: string) {
       );
 
       try {
-        // 添加超时控制的媒体文件上传
-        const uploadTimeout = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("媒体文件上传超时")), 60000);
-        });
-
-        customLog(
-          "service > record > getRecordStatusAction: 开始批量上传媒体文件"
-        );
-
         // 使用ConvertMedia将所有URLs上传到Cloudflare R2
-        const cloudflareUrlsPromise = Promise.all(
+        const cloudflareUrls = await Promise.all(
           processedData.urls.map(async (url: string) => {
             try {
               const cloudflareUrl = await ConvertMedia(
@@ -158,11 +133,6 @@ export async function getRecordStatusAction(recordId: string) {
             }
           })
         );
-
-        const cloudflareUrls = await Promise.race([
-          cloudflareUrlsPromise,
-          uploadTimeout,
-        ]);
 
         // 更新processedData中的URLs
         processedData.urls = cloudflareUrls.filter(
