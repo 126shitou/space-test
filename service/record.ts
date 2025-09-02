@@ -23,7 +23,8 @@ export async function getRecordStatusAction(recordId: string) {
       recordId
     );
 
-    console.time("getRecordStatusAction");
+    // 记录数据库查询开始时间
+    const dbQueryStart = Date.now();
     // 联表查询task
     const taskRecords = await db
       .select({
@@ -39,7 +40,8 @@ export async function getRecordStatusAction(recordId: string) {
       .innerJoin(records, eq(tasks.recordId, records.id))
       .where(eq(tasks.recordId, recordId))
       .limit(1);
-    console.timeEnd("getRecordStatusAction");
+    const dbQueryEnd = Date.now();
+    customLog("数据库查询耗时", `${dbQueryEnd - dbQueryStart}ms`);
     customLog(
       "service > record > getRecordStatusAction: 该次API的 taskRecords",
       JSON.stringify(taskRecords)
@@ -89,8 +91,12 @@ export async function getRecordStatusAction(recordId: string) {
     );
     customLog("第三方API请求", `URL: ${requestConfig.url}`);
 
+    // 记录第三方API请求开始时间
+    const apiRequestStart = Date.now();
     // 发起第三方API请求
     const response = await fetch(requestConfig.url, requestConfig.options);
+    const apiRequestEnd = Date.now();
+    customLog("第三方API请求耗时", `${apiRequestEnd - apiRequestStart}ms`);
 
     if (!response.ok)
       throw new Error(
@@ -116,6 +122,8 @@ export async function getRecordStatusAction(recordId: string) {
       );
 
       try {
+        // 记录媒体文件上传开始时间
+        const mediaUploadStart = Date.now();
         // 使用ConvertMedia将所有URLs上传到Cloudflare R2
         const cloudflareUrls = await Promise.all(
           processedData.urls.map(async (url: string) => {
@@ -145,6 +153,8 @@ export async function getRecordStatusAction(recordId: string) {
             }
           })
         );
+        const mediaUploadEnd = Date.now();
+        customLog("媒体文件上传耗时", `${mediaUploadEnd - mediaUploadStart}ms`);
 
         // 更新processedData中的URLs
         processedData.urls = cloudflareUrls.filter(

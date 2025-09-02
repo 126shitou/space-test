@@ -10,9 +10,10 @@ export async function getUserInfo() {
   try {
     const supabase = await createClient();
 
-    console.time("getUserInfoTime+++");
+    const getUserStart = Date.now();
     const { data } = await supabase.auth.getUser();
-    console.timeEnd("getUserInfoTime+++");
+    const getUserEnd = Date.now();
+    customSuccess("获取用户信息耗时", `${getUserEnd - getUserStart}ms`);
 
     const uid = data.user?.id || null;
 
