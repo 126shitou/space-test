@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 创建record记录并获取创建的record
-    [newRecord] = await db
+    const [nr] = await db
       .insert(records)
       .values({
         supabaseId: user?.id || "anonymous", // 用户ID，如果未登录则使用匿名
@@ -102,7 +102,9 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    customLog("创建的record记录", JSON.stringify(newRecord));
+    newRecord = nr;
+    
+    customLog("创建的record记录", JSON.stringify(nr));
 
     // 如果登录了 查询积分是否足够
     if (pointsCount > 0 && isLogin) {
@@ -127,19 +129,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-
- 
     console.log("requestConfig", JSON.stringify(requestConfig));
 
     // 向三方平台发送请求
     const response = await fetch(requestConfig.url, requestConfig.options);
-    
+
     if (!response.ok) {
       customError(
         "api > thirdApi > generate > POST: 第三方API请求失败",
         `API请求失败: ${response.status} ${response.statusText}`
       );
- 
 
       // 更新record状态为失败
       await db
@@ -173,7 +172,8 @@ export async function POST(request: NextRequest) {
 
       customLog(
         "积分扣除成功",
-        `用户${user!.id}扣除${pointsCount}积分，剩余${currentPoints - pointsCount
+        `用户${user!.id}扣除${pointsCount}积分，剩余${
+          currentPoints - pointsCount
         }积分`
       );
     }
@@ -190,8 +190,7 @@ export async function POST(request: NextRequest) {
       .returning();
 
     // 更新record状态为成功
-    await db
-      .update(records)
+    db.update(records)
       .set({
         // record的状态而不是task
         status: "success",
