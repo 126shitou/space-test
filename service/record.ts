@@ -22,12 +22,36 @@ export async function getRecordStatusAction(recordId: string) {
       "service > record > getRecordStatusAction: 该次API的 recordId",
       recordId
     );
+    
+    customLog(
+      "service > record > getRecordStatusAction: 数据库开始查询",
+      JSON.stringify(db)
+    );
+
+    console.log("Step 1: Testing basic tasks query");
+    const tasksOnly = await db.select().from(tasks).limit(1);
+    console.log("step1:", JSON.stringify(tasksOnly));
+    // 步骤 2: 测试 records 查询
+    console.log("Step 2: Testing records query");
+    const recordsOnly = await db
+      .select()
+      .from(records)
+      .where(eq(records.id, recordId))
+      .limit(1);
+    console.log("step2:", JSON.stringify(recordsOnly));
+    // 步骤 3: 测试 JOIN
+    console.log("Step 3: Testing join");
+    const joinTest = await db
+      .select()
+      .from(tasks)
+      .innerJoin(records, eq(tasks.recordId, records.id))
+      .limit(1);
+    console.log("step3:", JSON.stringify(joinTest));
 
     // 记录数据库查询开始时间
     const dbQueryStart = Date.now();
-    customLog("service > record > getRecordStatusAction: 数据库开始查询", "");
-    // 为数据库查询添加超时控制
-    const dbQueryPromise = db
+
+    const taskRecords = await db
       .select({
         id: tasks.id,
         taskId: tasks.taskId,
@@ -41,9 +65,6 @@ export async function getRecordStatusAction(recordId: string) {
       .innerJoin(records, eq(tasks.recordId, records.id))
       .where(eq(records.id, recordId))
       .limit(1);
-
-    // 直接执行数据库查询，不设置超时
-    const taskRecords = (await dbQueryPromise) as any[];
 
     const dbQueryEnd = Date.now();
     customLog(
