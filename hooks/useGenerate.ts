@@ -98,7 +98,7 @@ export const useGenerate = () => {
       } catch (error) {
         setError(error instanceof Error ? error.message : String(error));
         setTaskStep("none");
-        new Promise((resolve) => setTimeout(resolve, 0));
+        new Promise((reject) => reject(error));
         throw error;
       }
     };

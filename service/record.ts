@@ -8,6 +8,7 @@ import { Result } from "@/lib/utils/result";
 import { GenerationStatus } from "@/types/generation";
 import { ToolFactory } from "@/lib/factory";
 import ConvertMedia from "@/service/media";
+import { createClient } from "@/lib/db/supabase/server";
 
 /**
  * 数据库操作重试机制
@@ -47,6 +48,12 @@ const executeWithRetry = async <T>(
  */
 export async function getRecordStatusAction(recordId: string) {
   try {
+    // 验证用户登录状态
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     customLog("service > record > getRecordStatusAction: recordId", recordId);
 
     customLog(
