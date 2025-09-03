@@ -22,31 +22,59 @@ export async function getRecordStatusAction(recordId: string) {
       "service > record > getRecordStatusAction: 该次API的 recordId",
       recordId
     );
-    
+
     customLog(
       "service > record > getRecordStatusAction: 数据库开始查询",
       JSON.stringify(db)
     );
 
     console.log("Step 1: Testing basic tasks query");
-    const tasksOnly = await db.select().from(tasks).limit(1);
-    console.log("step1:", JSON.stringify(tasksOnly));
+    try {
+      const tasksOnly = await db.select().from(tasks).limit(1);
+      console.log("step1 success:", JSON.stringify(tasksOnly));
+    } catch (error) {
+      console.error("step1 error:", error);
+      customError(
+        "数据库查询失败 - tasks表",
+        error instanceof Error ? error.message : String(error)
+      );
+      throw error;
+    }
     // 步骤 2: 测试 records 查询
     console.log("Step 2: Testing records query");
-    const recordsOnly = await db
-      .select()
-      .from(records)
-      .where(eq(records.id, recordId))
-      .limit(1);
-    console.log("step2:", JSON.stringify(recordsOnly));
+    try {
+      const recordsOnly = await db
+        .select()
+        .from(records)
+        .where(eq(records.id, recordId))
+        .limit(1);
+      console.log("step2 success:", JSON.stringify(recordsOnly));
+    } catch (error) {
+      console.error("step2 error:", error);
+      customError(
+        "数据库查询失败 - records表",
+        error instanceof Error ? error.message : String(error)
+      );
+      throw error;
+    }
+
     // 步骤 3: 测试 JOIN
     console.log("Step 3: Testing join");
-    const joinTest = await db
-      .select()
-      .from(tasks)
-      .innerJoin(records, eq(tasks.recordId, records.id))
-      .limit(1);
-    console.log("step3:", JSON.stringify(joinTest));
+    try {
+      const joinTest = await db
+        .select()
+        .from(tasks)
+        .innerJoin(records, eq(tasks.recordId, records.id))
+        .limit(1);
+      console.log("step3 success:", JSON.stringify(joinTest));
+    } catch (error) {
+      console.error("step3 error:", error);
+      customError(
+        "数据库查询失败 - JOIN操作",
+        error instanceof Error ? error.message : String(error)
+      );
+      throw error;
+    }
 
     // 记录数据库查询开始时间
     const dbQueryStart = Date.now();
