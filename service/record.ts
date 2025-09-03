@@ -10,6 +10,37 @@ import { ToolFactory } from "@/lib/factory";
 import ConvertMedia from "@/service/media";
 
 /**
+ * 数据库操作重试机制
+ * @param operation - 要执行的数据库操作
+ * @param maxRetries - 最大重试次数
+ * @param delay - 重试间隔时间（毫秒）
+ */
+const executeWithRetry = async <T>(
+  operation: () => Promise<T>,
+  maxRetries = 3,
+  delay = 1000
+): Promise<T> => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      customLog(
+        `数据库操作重试 ${i + 1}/${maxRetries}`,
+        error instanceof Error ? error.message : String(error)
+      );
+
+      if (i === maxRetries - 1) {
+        throw error;
+      }
+
+      // 等待后重试
+      await new Promise((resolve) => setTimeout(resolve, delay * (i + 1)));
+    }
+  }
+  throw new Error("重试机制异常");
+};
+
+/**
  * 获取任务状态的Server Action
  * @param recordId - 记录ID
  * @returns 返回任务状态结果
@@ -30,7 +61,9 @@ export async function getRecordStatusAction(recordId: string) {
 
     console.log("Step 1: Testing basic tasks query");
     try {
-      const tasksOnly = await db.select().from(tasks).limit(1);
+      const tasksOnly = await executeWithRetry(() =>
+        db.select().from(tasks).limit(1)
+      );
       console.log("step1 success:", JSON.stringify(tasksOnly));
     } catch (error) {
       console.error("step1 error:", error);
@@ -43,11 +76,9 @@ export async function getRecordStatusAction(recordId: string) {
     // 步骤 2: 测试 records 查询
     console.log("Step 2: Testing records query");
     try {
-      const recordsOnly = await db
-        .select()
-        .from(records)
-        .where(eq(records.id, recordId))
-        .limit(1);
+      const recordsOnly = await executeWithRetry(() =>
+        db.select().from(records).where(eq(records.id, recordId)).limit(1)
+      );
       console.log("step2 success:", JSON.stringify(recordsOnly));
     } catch (error) {
       console.error("step2 error:", error);
@@ -79,20 +110,22 @@ export async function getRecordStatusAction(recordId: string) {
     // 记录数据库查询开始时间
     const dbQueryStart = Date.now();
 
-    const taskRecords = await db
-      .select({
-        id: tasks.id,
-        taskId: tasks.taskId,
-        status: tasks.status,
-        submitAt: tasks.submitAt,
-        tool: records.tool,
-        supabaseId: records.supabaseId,
-        recordId: records.id,
-      })
-      .from(tasks)
-      .innerJoin(records, eq(tasks.recordId, records.id))
-      .where(eq(records.id, recordId))
-      .limit(1);
+    const taskRecords = await executeWithRetry(() =>
+      db
+        .select({
+          id: tasks.id,
+          taskId: tasks.taskId,
+          status: tasks.status,
+          submitAt: tasks.submitAt,
+          tool: records.tool,
+          supabaseId: records.supabaseId,
+          recordId: records.id,
+        })
+        .from(tasks)
+        .innerJoin(records, eq(tasks.recordId, records.id))
+        .where(eq(records.id, recordId))
+        .limit(1)
+    );
 
     const dbQueryEnd = Date.now();
     customLog(
