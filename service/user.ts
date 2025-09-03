@@ -2,12 +2,14 @@
 import { customError, customSuccess } from "@/lib/utils";
 import { Result } from "@/lib/utils/result";
 import { createClient } from "@/lib/db/supabase/server";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { users } from "@/lib/db/schema/user";
 import { eq } from "drizzle-orm";
 
 export async function getUserInfo() {
   try {
+    const db = createDb();
+
     const supabase = await createClient();
 
     const getUserStart = Date.now();

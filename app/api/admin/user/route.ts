@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { customLog } from "@/lib/utils";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { users, type User } from "@/lib/db/schema/user";
 import { eq, and, like, isNotNull, count } from "drizzle-orm";
 
@@ -18,48 +18,50 @@ export async function GET(request: Request) {
   customLog("api > admin > user", "query user data");
 
   const { searchParams } = new URL(request.url);
-  
+
   // 获取查询参数
   const queryParams: QueryParams = {
-    email: searchParams.get('email') || undefined,
-    name: searchParams.get('name') || undefined,
-    status: searchParams.get('status') || undefined,
-    lastLogin: searchParams.get('lastLogin') || undefined,
-    supabaseId: searchParams.get('supabaseId') || undefined,
-    page: parseInt(searchParams.get('page') || '1'),
-    pageSize: parseInt(searchParams.get('pageSize') || '10')
+    email: searchParams.get("email") || undefined,
+    name: searchParams.get("name") || undefined,
+    status: searchParams.get("status") || undefined,
+    lastLogin: searchParams.get("lastLogin") || undefined,
+    supabaseId: searchParams.get("supabaseId") || undefined,
+    page: parseInt(searchParams.get("page") || "1"),
+    pageSize: parseInt(searchParams.get("pageSize") || "10"),
   };
 
   customLog(
-    "api > admin > user", 
+    "api > admin > user",
     `Query parameters: ${JSON.stringify(queryParams)}`
   );
 
   try {
     const result = await handleUserQuery(queryParams);
-    
+
     if (result.users.length > 0) {
       customLog(
         "api > admin > user",
         `Found ${result.users.length} users, total: ${result.total}`
       );
-      
+
       return NextResponse.json({
         success: true,
         data: {
-          users: result.users.map(user => formatUserResponse(user, queryParams.status)),
+          users: result.users.map((user) =>
+            formatUserResponse(user, queryParams.status)
+          ),
           pagination: {
             page: queryParams.page || 1,
             pageSize: queryParams.pageSize || 10,
             total: result.total,
-            totalPages: Math.ceil(result.total / (queryParams.pageSize || 10))
-          }
+            totalPages: Math.ceil(result.total / (queryParams.pageSize || 10)),
+          },
         },
-        message: "获取用户信息成功"
+        message: "获取用户信息成功",
       });
     } else {
       customLog("api > admin > user", "No users found matching criteria");
-      
+
       return NextResponse.json({
         success: true,
         data: {
@@ -68,10 +70,10 @@ export async function GET(request: Request) {
             page: queryParams.page || 1,
             pageSize: queryParams.pageSize || 10,
             total: 0,
-            totalPages: 0
-          }
+            totalPages: 0,
+          },
         },
-        message: "未找到匹配的用户"
+        message: "未找到匹配的用户",
       });
     }
   } catch (error) {
@@ -79,20 +81,24 @@ export async function GET(request: Request) {
       "api > admin > user",
       `Error querying user: ${JSON.stringify(error)}`
     );
-    
+
     return NextResponse.json(
       {
         success: false,
         data: null,
-        message: "服务器内部错误"
+        message: "服务器内部错误",
       },
       { status: 500 }
     );
   }
 }
 
-const handleUserQuery = async (params: QueryParams): Promise<{ users: User[], total: number }> => {
+const handleUserQuery = async (
+  params: QueryParams
+): Promise<{ users: User[]; total: number }> => {
   try {
+    const db = createDb();
+
     const page = params.page || 1;
     const pageSize = Math.min(params.pageSize || 10, 100); // 限制最大页面大小为100
     const offset = (page - 1) * pageSize;
@@ -102,7 +108,7 @@ const handleUserQuery = async (params: QueryParams): Promise<{ users: User[], to
       ...(params.supabaseId ? [eq(users.supabaseId, params.supabaseId)] : []),
       ...(params.email ? [eq(users.email, params.email)] : []),
       ...(params.name ? [like(users.name, `%${params.name}%`)] : []),
-      ...(params.lastLogin ? [isNotNull(users.lastLogin)] : [])
+      ...(params.lastLogin ? [isNotNull(users.lastLogin)] : []),
     ].filter(Boolean);
 
     customLog(
@@ -111,14 +117,15 @@ const handleUserQuery = async (params: QueryParams): Promise<{ users: User[], to
     );
 
     // 构建where条件
-    const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+    const whereCondition =
+      conditions.length > 0 ? and(...conditions) : undefined;
 
     // 获取总数
     const totalResult = await db
       .select({ count: count() })
       .from(users)
       .where(whereCondition);
-    
+
     const total = totalResult[0]?.count || 0;
 
     // 执行分页查询
@@ -159,6 +166,6 @@ const formatUserResponse = (user: User, status?: string) => {
     status: status || "normal",
     ipAddr: "", // 数据库中暂无此字段
     createdAt: user.createdAt.toISOString(),
-    updatedAt: user.updatedAt.toISOString()
+    updatedAt: user.updatedAt.toISOString(),
   };
 };

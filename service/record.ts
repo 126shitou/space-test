@@ -1,7 +1,7 @@
 "use server";
 
 import { customError, customLog, customSuccess } from "@/lib/utils/log";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { tasks, records } from "@/lib/db/schema/generation";
 import { eq } from "drizzle-orm";
 import { Result } from "@/lib/utils/result";
@@ -53,6 +53,7 @@ export async function getRecordStatusAction(recordId: string) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+    const db = createDb();
 
     customLog("service > record > getRecordStatusAction: recordId", recordId);
 

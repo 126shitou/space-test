@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { GenerationStatus } from "@/types/generation";
 import { BaseTool } from "./base";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { tasks } from "@/lib/db/schema/generation";
 import { eq } from "drizzle-orm";
 import { AIImageGeneratorConfig } from "@/lib/config/tool";
@@ -87,6 +87,8 @@ export class AiImgGeneratorTool implements BaseTool {
 
     // 更新数据库中的任务状态
     if (taskId) {
+      const db = createDb();
+
       try {
         await db
           .update(tasks)

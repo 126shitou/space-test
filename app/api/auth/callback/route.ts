@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 // The client you created from the Server-Side Auth instructions
 import { createClient } from "@/lib/db/supabase/server";
 import { customLog } from "@/lib/utils";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { users, type User, type NewUser } from "@/lib/db/schema/user";
 import { eq } from "drizzle-orm";
 
@@ -32,7 +32,6 @@ export async function GET(request: Request) {
       let user = null;
       console.log("loginType", loginType);
 
-      
       switch (loginType) {
         case "github":
           user = await handleGithubData(data);
@@ -96,6 +95,7 @@ const handleGithubData = async (data: any): Promise<User | null> => {
       subscriptionType: "free", // 默认订阅类型
       lastLogin: new Date(),
     };
+    const db = createDb();
 
     // 检查用户是否已存在
     const existingUser = await db
@@ -174,6 +174,7 @@ const handleGoogleData = async (data: any): Promise<User | null> => {
       subscriptionType: "free", // 默认订阅类型
       lastLogin: new Date(),
     };
+    const db = createDb();
 
     // 检查用户是否已存在
     const existingUser = await db

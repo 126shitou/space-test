@@ -2,7 +2,7 @@
 
 import { uploadSingleFile } from "@/lib/services/cf-upload";
 import { customError, customLog, customSuccess } from "@/lib/utils/log";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { medias } from "@/lib/db/schema/generation";
 import { eq } from "drizzle-orm";
 
@@ -73,6 +73,8 @@ export default async function ConvertMedia(
   }
 ): Promise<string> {
   customLog("media > ConvertMedia", `${JSON.stringify(uploadOptions)}`);
+  const db = createDb();
+
   try {
     // 第一步：下载受保护的媒体资源
     customLog("media > ConvertMedia", `开始下载媒体资源: ${url}`);
@@ -190,6 +192,8 @@ export async function updateMediaAspectRatio(
   aspectRatio: string,
   mediaId?: string
 ): Promise<boolean> {
+  const db = createDb();
+
   try {
     customLog(
       "media > updateMediaAspectRatio",

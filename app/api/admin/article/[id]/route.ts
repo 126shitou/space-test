@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { customLog } from "@/lib/utils";
 import { Result } from "@/lib/utils/result";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { blogs, type Blog } from "@/lib/db/schema/article";
 import { eq } from "drizzle-orm";
 
@@ -14,6 +14,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const db = createDb();
     const { id } = await params;
     customLog("获取文章详细信息", JSON.stringify({ id }));
 
@@ -54,6 +55,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const db = createDb();
+
     const { id } = await params;
     const body = await request.json();
     const { title, content, summary, author, category, tags, status } = body;
@@ -120,6 +123,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const db = createDb();
+
     const { id } = await params;
     customLog("管理员删除博客文章", JSON.stringify({ id }));
 

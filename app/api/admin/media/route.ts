@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { customLog } from "@/lib/utils";
 import { Result } from "@/lib/utils/result";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { medias, type Media } from "@/lib/db/schema/generation";
 import {
   eq,
@@ -50,6 +50,7 @@ type EditMediaParams = {
  */
 export async function GET(request: Request) {
   customLog("api > admin > media", "query media data");
+  const db = createDb();
 
   const { searchParams } = new URL(request.url);
 
@@ -128,6 +129,8 @@ const handleMediaQuery = async (
   params: QueryParams
 ): Promise<{ medias: Media[]; total: number }> => {
   try {
+    const db = createDb();
+
     const page = params.page || 1;
     const pageSize = Math.min(params.pageSize || 10, 100); // 限制最大页面大小为100
     const offset = (page - 1) * pageSize;
@@ -220,6 +223,8 @@ export async function PATCH(request: Request) {
   customLog("api > admin > media", "batch set category");
 
   try {
+    const db = createDb();
+
     const body: BatchSetCategoryParams = await request.json();
     const { mediaIds, category } = body;
 
@@ -337,6 +342,7 @@ export async function DELETE(request: Request) {
       "api > admin > media > DELETE",
       `Deleting ${mediaIds.length} medias: ${JSON.stringify(mediaIds)}`
     );
+    const db = createDb();
 
     // 执行批量软删除
     const deleteResult = await db
@@ -507,6 +513,7 @@ export async function PUT(request: Request) {
     if (supabaseId !== undefined) {
       updateData.supabaseId = supabaseId;
     }
+    const db = createDb();
 
     // 如果提供了posterUrl，将其存储到meta字段中（仅限视频类型）
     if (posterUrl !== undefined) {

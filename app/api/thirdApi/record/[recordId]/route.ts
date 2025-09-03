@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { customError, customLog, customSuccess } from "@/lib/utils/log";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { tasks, records } from "@/lib/db/schema/generation";
 import { eq } from "drizzle-orm";
 import { Result } from "@/lib/utils/result";
@@ -13,6 +13,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ recordId: string }> }
 ) {
+  const db = createDb();
+
   try {
     const { recordId } = await params;
 

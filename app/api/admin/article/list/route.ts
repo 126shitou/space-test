@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { customLog } from "@/lib/utils";
 import { Result } from "@/lib/utils/result";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { blogs, type Blog } from "@/lib/db/schema/article";
 import { eq, and, like, count, desc, ilike } from "drizzle-orm";
 
@@ -21,6 +21,8 @@ type QueryParams = {
  */
 export async function GET(request: Request) {
   try {
+    const db = createDb();
+
     const { searchParams } = new URL(request.url);
 
     // 解析查询参数
@@ -64,6 +66,7 @@ const handleArticleQuery = async (
   params: QueryParams
 ): Promise<{ articles: Blog[]; total: number }> => {
   const { title, status, category, author, page = 1, pageSize = 10 } = params;
+  const db = createDb();
 
   // 构建查询条件
   const conditions = [];

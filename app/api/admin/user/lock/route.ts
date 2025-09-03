@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { customLog } from "@/lib/utils";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { users, type User } from "@/lib/db/schema/user";
 import { eq } from "drizzle-orm";
 
@@ -15,33 +15,35 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { supabaseId, lockReason } = body as LockUserData;
-    
+
     customLog(
       "api > admin > user > lock",
-      `Locking user: ${supabaseId}, reason: ${lockReason || 'No reason provided'}`
+      `Locking user: ${supabaseId}, reason: ${
+        lockReason || "No reason provided"
+      }`
     );
 
     const lockedUser = await handleUserLock(supabaseId, lockReason);
-    
+
     if (lockedUser) {
       customLog(
         "api > admin > user > lock",
         `User locked successfully: ${lockedUser.email}`
       );
-      
+
       return NextResponse.json({
         success: true,
         data: null,
-        message: "用户锁定成功"
+        message: "用户锁定成功",
       });
     } else {
       customLog("api > admin > user > lock", "User not found for locking");
-      
+
       return NextResponse.json(
         {
           success: false,
           data: null,
-          message: "用户不存在"
+          message: "用户不存在",
         },
         { status: 404 }
       );
@@ -51,12 +53,12 @@ export async function POST(request: Request) {
       "api > admin > user > lock",
       `Error locking user: ${JSON.stringify(error)}`
     );
-    
+
     return NextResponse.json(
       {
         success: false,
         data: null,
-        message: "服务器内部错误"
+        message: "服务器内部错误",
       },
       { status: 500 }
     );
@@ -72,6 +74,7 @@ const handleUserLock = async (
     if (!supabaseId) {
       throw new Error("请提供用户ID: supabaseId");
     }
+    const db = createDb();
 
     // 验证用户是否存在
     const existingUser = await db
@@ -103,7 +106,7 @@ const handleUserLock = async (
     // 保存原始积分到subscriptionsStartDate字段（临时方案）
     const updateFields: any = {
       points: -1, // 使用-1标记锁定状态
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     const lockedUsers = await db
@@ -114,7 +117,9 @@ const handleUserLock = async (
 
     customLog(
       "api > admin > user > lock > handleUserLock",
-      `User lock completed for: ${supabaseId}, reason: ${lockReason || 'No reason'}`
+      `User lock completed for: ${supabaseId}, reason: ${
+        lockReason || "No reason"
+      }`
     );
 
     return lockedUsers.length > 0 ? lockedUsers[0] : null;

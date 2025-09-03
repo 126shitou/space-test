@@ -5,7 +5,7 @@ import { customLog, customError } from "@/lib/utils/log";
 import { Result } from "@/lib/utils/result";
 import { ToolFactory } from "@/lib/factory";
 import { createClient } from "@/lib/db/supabase/server";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { records, tasks } from "@/lib/db/schema/generation";
 import { users } from "@/lib/db/schema/user";
 import { GenerationStatus } from "@/types/generation";
@@ -24,6 +24,7 @@ const baseRequestSchema = z.object({
  */
 export async function generateAction(formData: FormData) {
   let newRecord: any; // 声明变量以便在catch块中使用
+  const db = createDb();
 
   try {
     customLog(

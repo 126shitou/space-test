@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { customLog } from "@/lib/utils";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { users, type User, type NewUser } from "@/lib/db/schema/user";
 import { eq } from "drizzle-orm";
 
@@ -24,33 +24,33 @@ export async function PUT(
   try {
     const { supabaseId } = await params;
     const body = await request.json();
-    
+
     customLog(
       "api > admin > users > PUT",
       `Updating user: ${supabaseId}, data: ${JSON.stringify(body)}`
     );
 
     const updatedUser = await handleUserUpdate(supabaseId, body);
-    
+
     if (updatedUser) {
       customLog(
         "api > admin > users > PUT",
         `User updated successfully: ${updatedUser.email}`
       );
-      
+
       return NextResponse.json({
         success: true,
         data: null,
-        message: "用户信息更新成功"
+        message: "用户信息更新成功",
       });
     } else {
       customLog("api > admin > users > PUT", "User not found for update");
-      
+
       return NextResponse.json(
         {
           success: false,
           data: null,
-          message: "用户不存在"
+          message: "用户不存在",
         },
         { status: 404 }
       );
@@ -60,12 +60,12 @@ export async function PUT(
       "api > admin > users > PUT",
       `Error updating user: ${JSON.stringify(error)}`
     );
-    
+
     return NextResponse.json(
       {
         success: false,
         data: null,
-        message: "服务器内部错误"
+        message: "服务器内部错误",
       },
       { status: 500 }
     );
@@ -77,6 +77,8 @@ const handleUserUpdate = async (
   updateData: UpdateUserData
 ): Promise<User | null> => {
   try {
+    const db = createDb();
+
     // 验证用户是否存在
     const existingUser = await db
       .select()

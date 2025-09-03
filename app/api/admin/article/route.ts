@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { customLog } from "@/lib/utils";
 import { Result } from "@/lib/utils/result";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { blogs } from "@/lib/db/schema/article";
 
 /**
@@ -12,6 +12,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { title, content, summary, author, category, tags, status } = body;
+    const db = createDb();
 
     // 参数验证
     if (!title || !content) {

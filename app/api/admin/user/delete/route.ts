@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { customLog } from "@/lib/utils";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { users, type User } from "@/lib/db/schema/user";
 import { eq } from "drizzle-orm";
 
@@ -14,33 +14,30 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { supabaseId } = body as DeleteUserData;
-    
-    customLog(
-      "api > admin > user > delete",
-      `Deleting user: ${supabaseId}`
-    );
+
+    customLog("api > admin > user > delete", `Deleting user: ${supabaseId}`);
 
     const deletedUser = await handleUserDelete(supabaseId);
-    
+
     if (deletedUser) {
       customLog(
         "api > admin > user > delete",
         `User deleted successfully: ${deletedUser.email}`
       );
-      
+
       return NextResponse.json({
         success: true,
         data: null,
-        message: "用户删除成功"
+        message: "用户删除成功",
       });
     } else {
       customLog("api > admin > user > delete", "User not found for deletion");
-      
+
       return NextResponse.json(
         {
           success: false,
           data: null,
-          message: "用户不存在"
+          message: "用户不存在",
         },
         { status: 404 }
       );
@@ -50,12 +47,12 @@ export async function POST(request: Request) {
       "api > admin > user > delete",
       `Error deleting user: ${JSON.stringify(error)}`
     );
-    
+
     return NextResponse.json(
       {
         success: false,
         data: null,
-        message: "服务器内部错误"
+        message: "服务器内部错误",
       },
       { status: 500 }
     );
@@ -68,6 +65,7 @@ const handleUserDelete = async (supabaseId: string): Promise<User | null> => {
     if (!supabaseId) {
       throw new Error("请提供用户ID: supabaseId");
     }
+    const db = createDb();
 
     // 验证用户是否存在
     const existingUser = await db

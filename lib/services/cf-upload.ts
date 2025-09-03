@@ -1,6 +1,6 @@
 // 上传文件到cloudflare
 import { z } from "zod";
-import { db } from "@/lib/db";
+import { createDb } from "@/lib/db";
 import { medias } from "@/lib/db/schema/generation";
 import { customError, customLog, customSuccess } from "@/lib/utils/log";
 import {
@@ -98,6 +98,7 @@ export async function saveFileToDatabase(
         etag: fileInfo.etag,
         path: fileInfo.path,
       };
+      const db = createDb();
 
       // 保存到medias表
       await db.insert(medias).values({
