@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@aws-sdk/client-s3':
-        specifier: ^3.873.0
-        version: 3.873.0
       '@next/third-parties':
         specifier: ^15.4.5
         version: 15.4.6(next@15.4.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0)
@@ -59,6 +56,9 @@ importers:
       accept-language:
         specifier: ^3.0.20
         version: 3.0.20
+      aws4fetch:
+        specifier: ^1.0.20
+        version: 1.0.20
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

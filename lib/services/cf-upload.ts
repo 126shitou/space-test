@@ -3,11 +3,7 @@ import { z } from "zod";
 import { createDb } from "@/lib/db";
 import { medias } from "@/lib/db/schema/generation";
 import { customError, customLog, customSuccess } from "@/lib/utils/log";
-import {
-  S3Client,
-  PutObjectCommand,
-  HeadObjectCommand,
-} from "@aws-sdk/client-s3";
+import { AwsClient } from "aws4fetch";
 
 // 定义上传请求的校验schema
 export const uploadSchema = z.object({
@@ -21,14 +17,17 @@ export const uploadSchema = z.object({
 });
 
 // Cloudflare R2 客户端配置
-const r2Client = new S3Client({
+const r2Client = new AwsClient({
+  service: "s3",
   region: "auto",
-  endpoint: process.env.CLOUDFLARE_S3_URL,
-  credentials: {
-    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
-  },
+  accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
+  secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
 });
+
+// R2存储URL
+const R2_URL =
+  process.env.CLOUDFLARE_S3_URL ||
+  `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 
 // 支持的文件类型
 export const SUPPORTED_IMAGE_TYPES = [
@@ -179,18 +178,11 @@ export function processFileName(
  */
 export async function checkFileExists(filePath: string): Promise<boolean> {
   try {
-    const command = new HeadObjectCommand({
-      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
-      Key: filePath,
-    });
-    await r2Client.send(command);
-    return true; // 文件存在
+    const url = `${R2_URL}/${process.env.CLOUDFLARE_R2_BUCKET_NAME}/${filePath}`;
+    const response = await r2Client.fetch(url, { method: "HEAD" });
+    return response.ok; // 文件存在
   } catch (error: any) {
-    if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
-      return false; // 文件不存在
-    }
-    // 其他错误，重新抛出
-    throw error;
+    return false; // 文件不存在或其他错误
   }
 }
 
@@ -239,29 +231,38 @@ export async function uploadSingleFile(
     }
   }
 
-  // 将文件转换为 Uint8Array (兼容Edge Runtime)
-  const fileBuffer = new Uint8Array(await file.arrayBuffer());
+  // 将文件转换为 ArrayBuffer
+  const fileBuffer = await file.arrayBuffer();
 
-  // 准备上传参数
-  const uploadParams = {
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
-    Key: fullPath,
-    Body: fileBuffer,
-    ContentType: file.type,
-    ContentLength: file.size,
-    Metadata: {
-      // 对文件名进行URL编码以避免特殊字符问题
-      "original-name": encodeURIComponent(file.name),
-      "upload-time": new Date().toISOString(),
-      "file-size": file.size.toString(),
-    },
+  // 构建上传URL
+  const uploadUrl = `${R2_URL}/${process.env.CLOUDFLARE_R2_BUCKET_NAME}/${fullPath}`;
+
+  // 准备请求头
+  const headers = {
+    "Content-Type": file.type,
+    "Content-Length": file.size.toString(),
+    // 添加自定义元数据头
+    "x-amz-meta-original-name": encodeURIComponent(file.name),
+    "x-amz-meta-upload-time": new Date().toISOString(),
+    "x-amz-meta-file-size": file.size.toString(),
   };
 
   // 上传到 Cloudflare R2
-  const command = new PutObjectCommand(uploadParams);
-  const response = await r2Client.send(command);
+  const response = await r2Client.fetch(uploadUrl, {
+    method: "PUT",
+    body: fileBuffer,
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`上传失败: ${response.status} ${response.statusText}`);
+  }
 
   const publicUrl = `https://pub-d971bff5576c4337bba795092aa63092.r2.dev/${fullPath}`;
+
+  // 获取ETag从响应头
+  const etag =
+    response.headers.get("etag") || response.headers.get("ETag") || "";
 
   return {
     filename: fileName,
@@ -271,7 +272,7 @@ export async function uploadSingleFile(
     contentType: file.type,
     url: publicUrl,
     uploadTime: new Date().toISOString(),
-    etag: response.ETag || "",
+    etag: etag,
   };
 }
 
