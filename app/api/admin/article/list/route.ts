@@ -21,8 +21,6 @@ type QueryParams = {
  */
 export async function GET(request: Request) {
   try {
-    const db = createDb();
-
     const { searchParams } = new URL(request.url);
 
     // 解析查询参数

@@ -5,8 +5,8 @@ import { AwsClient } from "aws4fetch";
 
 // Cloudflare R2 客户端配置
 const r2Client = new AwsClient({
-  accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
-  secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
+  accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || "",
+  secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || "",
   region: "auto",
   service: "s3",
 });

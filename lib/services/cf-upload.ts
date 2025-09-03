@@ -20,8 +20,8 @@ export const uploadSchema = z.object({
 const r2Client = new AwsClient({
   service: "s3",
   region: "auto",
-  accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
-  secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
+  accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || "",
+  secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || "",
 });
 
 // R2存储URL

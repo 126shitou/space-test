@@ -8,8 +8,8 @@ import { AwsClient } from "aws4fetch";
 
 // 创建R2客户端
 const r2Client = new AwsClient({
-  accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
-  secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
+  accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || "",
+  secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || "",
   region: "auto",
   service: "s3",
 });
@@ -55,7 +55,9 @@ async function deleteSingleFile(key: string): Promise<{
     });
 
     if (!response.ok) {
-      throw new Error(`删除请求失败: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `删除请求失败: ${response.status} ${response.statusText}`
+      );
     }
 
     customSuccess(
@@ -108,7 +110,8 @@ async function batchDeleteFiles(keys: string[]): Promise<{
       keys.map(async (key) => {
         try {
           // 构建删除请求URL
-          const url = `${R2_URL}/${process.env.CLOUDFLARE_R2_BUCKET_NAME!}/${key}`;
+          const url = `${R2_URL}/${process.env
+            .CLOUDFLARE_R2_BUCKET_NAME!}/${key}`;
 
           // 执行DELETE请求
           const response = await r2Client.fetch(url, {
@@ -116,7 +119,9 @@ async function batchDeleteFiles(keys: string[]): Promise<{
           });
 
           if (!response.ok) {
-            throw new Error(`删除请求失败: ${response.status} ${response.statusText}`);
+            throw new Error(
+              `删除请求失败: ${response.status} ${response.statusText}`
+            );
           }
 
           return {
