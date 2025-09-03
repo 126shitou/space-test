@@ -40,12 +40,16 @@ export async function getRecordStatusAction(recordId: string) {
       .from(tasks)
       .innerJoin(records, eq(tasks.recordId, records.id))
       .limit(1);
-    customLog("service > record > getRecordStatusAction: 数据库查询结束", "");
 
-    // 设置数据库查询超时（15秒）
+    // 设置数据库查询超时（30秒）- 增加超时时间
     const dbTimeout = new Promise((_, reject) => {
-      customLog("service > record > getRecordStatusAction: 数据库查询超时", "");
-      setTimeout(() => reject(new Error("数据库查询超时")), 15000);
+      setTimeout(() => {
+        customLog(
+          "service > record > getRecordStatusAction: 数据库查询超时",
+          ""
+        );
+        reject(new Error("数据库查询超时"));
+      }, 30000);
     });
 
     const taskRecords = (await Promise.race([
@@ -54,7 +58,9 @@ export async function getRecordStatusAction(recordId: string) {
     ])) as any[];
 
     const dbQueryEnd = Date.now();
+    customLog("service > record > getRecordStatusAction: 数据库查询结束", "");
     customLog("数据库查询耗时", `${dbQueryEnd - dbQueryStart}ms`);
+
     customLog(
       "service > record > getRecordStatusAction: 该次API的 taskRecords",
       JSON.stringify(taskRecords)
