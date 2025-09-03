@@ -239,8 +239,8 @@ export async function uploadSingleFile(
     }
   }
 
-  // 将文件转换为 Buffer
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
+  // 将文件转换为 Uint8Array (兼容Edge Runtime)
+  const fileBuffer = new Uint8Array(await file.arrayBuffer());
 
   // 准备上传参数
   const uploadParams = {
