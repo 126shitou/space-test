@@ -3,22 +3,19 @@ import { customError, customLog, customSuccess } from "@/lib/utils/log";
 import { Result } from "@/lib/utils/result";
 import { z } from "zod";
 
-// 导入AWS SDK用于与Cloudflare R2交互
-import {
-  S3Client,
-  DeleteObjectCommand,
-  DeleteObjectsCommand,
-} from "@aws-sdk/client-s3";
+// 导入aws4fetch用于与Cloudflare R2交互
+import { AwsClient } from "aws4fetch";
 
 // 创建R2客户端
-const r2Client = new S3Client({
+const r2Client = new AwsClient({
+  accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
+  secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
   region: "auto",
-  endpoint: process.env.CLOUDFLARE_S3_URL,
-  credentials: {
-    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
-  },
+  service: "s3",
 });
+
+// R2存储桶URL
+const R2_URL = process.env.CLOUDFLARE_S3_URL!;
 
 // 批量删除请求的验证schema
 const batchDeleteSchema = z.object({
@@ -49,12 +46,17 @@ async function deleteSingleFile(key: string): Promise<{
       `开始删除文件: ${key}`
     );
 
-    const command = new DeleteObjectCommand({
-      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
-      Key: key,
+    // 构建删除请求URL
+    const url = `${R2_URL}/${process.env.CLOUDFLARE_R2_BUCKET_NAME!}/${key}`;
+
+    // 执行DELETE请求
+    const response = await r2Client.fetch(url, {
+      method: "DELETE",
     });
 
-    await r2Client.send(command);
+    if (!response.ok) {
+      throw new Error(`删除请求失败: ${response.status} ${response.statusText}`);
+    }
 
     customSuccess(
       "api > admin > cf > delete > deleteSingleFile",
@@ -101,48 +103,35 @@ async function batchDeleteFiles(keys: string[]): Promise<{
       `开始批量删除 ${keys.length} 个文件`
     );
 
-    // 使用AWS SDK的批量删除功能
-    const command = new DeleteObjectsCommand({
-      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
-      Delete: {
-        Objects: keys.map((key) => ({ Key: key })),
-        Quiet: false, // 返回详细结果
-      },
-    });
+    // 使用并发删除替代批量删除功能
+    const results = await Promise.all(
+      keys.map(async (key) => {
+        try {
+          // 构建删除请求URL
+          const url = `${R2_URL}/${process.env.CLOUDFLARE_R2_BUCKET_NAME!}/${key}`;
 
-    const response = await r2Client.send(command);
+          // 执行DELETE请求
+          const response = await r2Client.fetch(url, {
+            method: "DELETE",
+          });
 
-    // 处理删除结果
-    const results: Array<{
-      key: string;
-      success: boolean;
-      error?: string;
-    }> = [];
+          if (!response.ok) {
+            throw new Error(`删除请求失败: ${response.status} ${response.statusText}`);
+          }
 
-    // 处理成功删除的文件
-    if (response.Deleted) {
-      response.Deleted.forEach((deleted) => {
-        if (deleted.Key) {
-          results.push({
-            key: deleted.Key,
+          return {
+            key,
             success: true,
-          });
-        }
-      });
-    }
-
-    // 处理删除失败的文件
-    if (response.Errors) {
-      response.Errors.forEach((error) => {
-        if (error.Key) {
-          results.push({
-            key: error.Key,
+          };
+        } catch (error: any) {
+          return {
+            key,
             success: false,
-            error: error.Message || "删除失败",
-          });
+            error: error.message || "删除失败",
+          };
         }
-      });
-    }
+      })
+    );
 
     // 统计结果
     const successCount = results.filter((r) => r.success).length;

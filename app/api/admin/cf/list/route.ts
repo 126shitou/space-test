@@ -1,21 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
 import { customError, customLog, customSuccess } from "@/lib/utils/log";
 import { Result } from "@/lib/utils/result";
-import {
-  S3Client,
-  ListObjectsV2Command,
-  ListObjectsV2CommandOutput,
-} from "@aws-sdk/client-s3";
+import { AwsClient } from "aws4fetch";
 
 // Cloudflare R2 客户端配置
-const r2Client = new S3Client({
+const r2Client = new AwsClient({
+  accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
+  secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
   region: "auto",
-  endpoint: process.env.CLOUDFLARE_S3_URL,
-  credentials: {
-    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
-  },
+  service: "s3",
 });
+
+// R2存储桶URL
+const R2_URL = process.env.CLOUDFLARE_S3_URL!;
+
+// XML解析函数
+function parseListObjectsV2Response(xmlText: string) {
+  // 简单的XML解析，提取Contents和CommonPrefixes
+  const contents: Array<{
+    Key: string;
+    Size: number;
+    LastModified: string;
+    ETag: string;
+  }> = [];
+  const commonPrefixes: Array<{ Prefix: string }> = [];
+
+  // 提取Contents
+  const contentsRegex = /<Contents>([\s\S]*?)<\/Contents>/g;
+  let match;
+  while ((match = contentsRegex.exec(xmlText)) !== null) {
+    const contentXml = match[1];
+    const key = contentXml.match(/<Key>(.*?)<\/Key>/)?.[1] || "";
+    const size = parseInt(contentXml.match(/<Size>(.*?)<\/Size>/)?.[1] || "0");
+    const lastModified =
+      contentXml.match(/<LastModified>(.*?)<\/LastModified>/)?.[1] || "";
+    const etag = contentXml.match(/<ETag>(.*?)<\/ETag>/)?.[1] || "";
+
+    contents.push({
+      Key: key,
+      Size: size,
+      LastModified: lastModified,
+      ETag: etag,
+    });
+  }
+
+  // 提取CommonPrefixes
+  const prefixesRegex =
+    /<CommonPrefixes><Prefix>(.*?)<\/Prefix><\/CommonPrefixes>/g;
+  while ((match = prefixesRegex.exec(xmlText)) !== null) {
+    commonPrefixes.push({ Prefix: match[1] });
+  }
+
+  // 提取其他字段
+  const nextContinuationToken = xmlText.match(
+    /<NextContinuationToken>(.*?)<\/NextContinuationToken>/
+  )?.[1];
+  const isTruncated =
+    xmlText.match(/<IsTruncated>(.*?)<\/IsTruncated>/)?.[1] === "true";
+
+  return {
+    Contents: contents,
+    CommonPrefixes: commonPrefixes,
+    NextContinuationToken: nextContinuationToken,
+    IsTruncated: isTruncated,
+  };
+}
 
 // 文件信息接口
 interface FileInfo {
@@ -71,28 +120,44 @@ export async function GET(request: NextRequest) {
       }`
     );
 
-    // 构建ListObjectsV2命令
-    const command = new ListObjectsV2Command({
-      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
-      Prefix: prefix,
-      MaxKeys: maxKeys,
-      ContinuationToken: continuationToken,
-      Delimiter: "/", // 使用分隔符来区分文件和目录
+    // 构建查询参数
+    const params = new URLSearchParams();
+    params.append("list-type", "2");
+    if (prefix) params.append("prefix", prefix);
+    params.append("max-keys", maxKeys.toString());
+    if (continuationToken)
+      params.append("continuation-token", continuationToken);
+    params.append("delimiter", "/"); // 使用分隔符来区分文件和目录
+
+    // 构建请求URL
+    const url = `${R2_URL}/${process.env
+      .CLOUDFLARE_R2_BUCKET_NAME!}?${params.toString()}`;
+
+    // 执行GET请求获取对象列表
+    const response = await r2Client.fetch(url, {
+      method: "GET",
     });
 
-    // 执行命令获取对象列表
-    const response: ListObjectsV2CommandOutput = await r2Client.send(command);
+    if (!response.ok) {
+      throw new Error(
+        `R2 API请求失败: ${response.status} ${response.statusText}`
+      );
+    }
+
+    // 解析XML响应
+    const xmlText = await response.text();
+    const xmlResponse = parseListObjectsV2Response(xmlText);
 
     customLog(
       "api > admin > cf > list > GET",
-      `获取到 ${response.Contents?.length || 0} 个文件，${
-        response.CommonPrefixes?.length || 0
+      `获取到 ${xmlResponse.Contents?.length || 0} 个文件，${
+        xmlResponse.CommonPrefixes?.length || 0
       } 个目录`
     );
 
     // 处理文件列表
-    const files: FileInfo[] = (response.Contents || []).map((object) => {
-      const key = object.Key!;
+    const files: FileInfo[] = (xmlResponse.Contents || []).map((object) => {
+      const key = object.Key;
       const name = key.split("/").pop() || key;
       const publicUrl = `https://pub-d971bff5576c4337bba795092aa63092.r2.dev/${key}`;
 
@@ -100,7 +165,7 @@ export async function GET(request: NextRequest) {
         key,
         name,
         size: object.Size || 0,
-        lastModified: object.LastModified?.toISOString() || "",
+        lastModified: object.LastModified || "",
         etag: object.ETag?.replace(/"/g, "") || "",
         url: publicUrl,
         type: "file" as const,
@@ -108,9 +173,9 @@ export async function GET(request: NextRequest) {
     });
 
     // 处理目录列表
-    const directories: DirectoryInfo[] = (response.CommonPrefixes || []).map(
+    const directories: DirectoryInfo[] = (xmlResponse.CommonPrefixes || []).map(
       (prefix) => {
-        const key = prefix.Prefix!;
+        const key = prefix.Prefix;
         const name = key.replace(/\/$/, "").split("/").pop() || key;
 
         return {
@@ -127,8 +192,8 @@ export async function GET(request: NextRequest) {
       directories,
       totalCount: files.length + directories.length,
       prefix: prefix || undefined,
-      continuationToken: response.NextContinuationToken,
-      isTruncated: response.IsTruncated || false,
+      continuationToken: xmlResponse.NextContinuationToken,
+      isTruncated: xmlResponse.IsTruncated || false,
     };
 
     customSuccess(
@@ -180,14 +245,31 @@ export async function POST(request: NextRequest) {
     const fileDetails = await Promise.allSettled(
       keys.map(async (key: string) => {
         try {
-          const command = new ListObjectsV2Command({
-            Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
-            Prefix: key,
-            MaxKeys: 1,
+          // 构建查询参数
+          const params = new URLSearchParams();
+          params.append("list-type", "2");
+          params.append("prefix", key);
+          params.append("max-keys", "1");
+
+          // 构建请求URL
+          const url = `${R2_URL}/${process.env
+            .CLOUDFLARE_R2_BUCKET_NAME!}?${params.toString()}`;
+
+          // 执行GET请求
+          const response = await r2Client.fetch(url, {
+            method: "GET",
           });
 
-          const response = await r2Client.send(command);
-          const object = response.Contents?.[0];
+          if (!response.ok) {
+            throw new Error(
+              `R2 API请求失败: ${response.status} ${response.statusText}`
+            );
+          }
+
+          // 解析XML响应
+          const xmlText = await response.text();
+          const xmlResponse = parseListObjectsV2Response(xmlText);
+          const object = xmlResponse.Contents?.[0];
 
           if (!object) {
             throw new Error(`文件不存在: ${key}`);
@@ -200,7 +282,7 @@ export async function POST(request: NextRequest) {
             key,
             name,
             size: object.Size || 0,
-            lastModified: object.LastModified?.toISOString() || "",
+            lastModified: object.LastModified || "",
             etag: object.ETag?.replace(/"/g, "") || "",
             url: publicUrl,
             type: "file" as const,
