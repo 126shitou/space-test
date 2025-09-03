@@ -26,6 +26,23 @@ export async function generateAction(formData: FormData) {
   let newRecord: any; // 声明变量以便在catch块中使用
 
   try {
+    customLog(
+      "service > record > getRecordStatusAction: 数据库开始查询",
+      JSON.stringify(db)
+    );
+
+    console.log("Step 1: Testing basic tasks query");
+    try {
+      const tasksOnly = await db.select().from(tasks).limit(1);
+      console.log("step1 success:", JSON.stringify(tasksOnly));
+    } catch (error) {
+      console.error("step1 error:", error);
+      customError(
+        "数据库查询失败 - tasks表",
+        error instanceof Error ? error.message : String(error)
+      );
+      throw error;
+    }
     // 从FormData中提取数据
     const tool = formData.get("tool") as string;
     const parametersStr = formData.get("parameters") as string;
