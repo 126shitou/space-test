@@ -39,26 +39,17 @@ export async function getRecordStatusAction(recordId: string) {
       })
       .from(tasks)
       .innerJoin(records, eq(tasks.recordId, records.id))
+      .where(eq(records.id, recordId))
       .limit(1);
 
-    // 设置数据库查询超时（30秒）- 增加超时时间
-    const dbTimeout = new Promise((_, reject) => {
-      setTimeout(() => {
-        customLog(
-          "service > record > getRecordStatusAction: 数据库查询超时",
-          ""
-        );
-        reject(new Error("数据库查询超时"));
-      }, 30000);
-    });
-
-    const taskRecords = (await Promise.race([
-      dbQueryPromise,
-      dbTimeout,
-    ])) as any[];
+    // 直接执行数据库查询，不设置超时
+    const taskRecords = (await dbQueryPromise) as any[];
 
     const dbQueryEnd = Date.now();
-    customLog("service > record > getRecordStatusAction: 数据库查询结束", "");
+    customLog(
+      "service > record > getRecordStatusAction: 数据库查询结束",
+      `${dbQueryEnd - dbQueryStart}ms`
+    );
     customLog("数据库查询耗时", `${dbQueryEnd - dbQueryStart}ms`);
 
     customLog(
